@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWS CloudFormation template to deploy an Amazon MSK (Apache Kafka) cluster
+
+Parameters:
+  Region:
+    Type: String
+    Default: !Ref "AWS::Region"
+  AccountID:
+    Type: String
+    Default: !Ref "AWS::AccountId"
+
+Resources:
+  MSKCluster:
+    Type: AWS::MSK::Cluster
+    Properties:
+      ClusterName: msk-eip-dev-uea1-on-kakfa-001
+      KafkaVersion: 3.5.1
+      NumberOfBrokerNodes: 3
+      BrokerNodeGroupInfo:
+        BrokerAZDistribution: DEFAULT
+        InstanceType: kafka.t3.small
+        ClientSubnets:
+          - subnet-065369ee5fda3ad5f
+          - subnet-0295b122f07fae2ad
+          - subnet-0e43ce724b4b109a2
+        SecurityGroups:          
+          - sg-0efe0de227652eb53
+        StorageInfo:
+          EBSStorageInfo:
+            VolumeSize: 1 
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: alias/aws/kafka
+      EnhancedMonitoring: PER_BROKER
+      LoggingInfo:
+        BrokerLogs:
+          CloudWatchLogs:
+            Enabled: true
+      OpenMonitoring:
+        Prometheus:
+          JmxExporter:
+            EnabledInBroker: false
+          NodeExporter:
+            EnabledInBroker: false
+      Tags:
+        - Key: "jbl:owner_email"
+          Value: "oscar_negrete@jabil.com"
+        - Key: "jbl:cost_center"
+          Value: "4123"
+        - Key: "jbl:backup"
+          Value: "no"
+        - Key: "jbl:project_name"
+          Value: "Kafka Streaming POC"
+        - Key: "jbl:support_team_email"
+          Value: "EIP_Support@jabil.com"
+
+  MSKClusterIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: iamr-eip-dev-uea1-on-kakfa-001
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - kafka.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: iamp-eip-dev-uea1-on-kakfa-001
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kafka-cluster:Connect
+                  - kafka-cluster:AlterCluster
+                  - kafka-cluster:DescribeCluster
+                Resource:
+                  - !Sub "arn:aws:kafka:${Region}:${AccountID}:cluster/MSKTutorialCluster/*"
+              - Effect: Allow
+                Action:
+                  - kafka-cluster:*Topic*
+                  - kafka-cluster:WriteData
+                  - kafka-cluster:ReadData
+                Resource:
+                  - !Sub "arn:aws:kafka:${Region}:${AccountID}:topic/MSKTutorialCluster/*"
+              - Effect: Allow
+                Action:
+                  - kafka-cluster:AlterGroup
+                  - kafka-cluster:DescribeGroup
+                Resource:
+                  - !Sub "arn:aws:kafka:${Region}:${AccountID}:group/MSKTutorialCluster/*"
+
+Outputs:
+  ClusterArn:
+    Description: The ARN of the MSK cluster
+    Value: !GetAtt MSKCluster.Arn
+  ClusterName:
+    Description: The name of the MSK cluster
+    Value: !Ref MSKCluster
+  BootstrapBrokers:
+    Description: A string containing one or more hostname:port pairs
+    Value: !GetAtt MSKCluster.BootstrapBrokers
