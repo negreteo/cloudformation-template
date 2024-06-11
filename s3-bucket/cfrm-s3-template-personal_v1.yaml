@@ -1,0 +1,294 @@
+# ISSUE: Creates a new lambda function every time the stack is created. Creation of a new stack will fail.
+# ISSUE: Creates a new lambda execution and cloudwatch policies and a role every time the stack is created. Creation of a new stack will fail.
+# NOTE: When deleting the stack and its resources, first Empty the bucket and then delete the stack.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This CloudFormation template creates a S3 Bucket following the EMS Data Services standards"
+Metadata:
+    Version: 2.0
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                  default: "BUCKET NAME"
+              Parameters:
+                  - DivisionName
+                  - EnvironmentName
+                  - RegionAcronym
+                  - ProjectIdentifier
+                  - IterationNumber
+                  - FoldersToCreate
+            - Label:
+                  default: "PROJECT INFORMATION"
+              Parameters:
+                  - ProjectName
+                  - CostCenter
+                  - SupportTeamEmail
+                  - OwnerEmail
+        ParameterLabels:
+            DivisionName:
+                default: Division Name
+            EnvironmentName:
+                default: Environment Name
+            RegionAcronym:
+                default: Region Acronym
+            ProjectIdentifier:
+                default: Project Identifier
+            IterationNumber:
+                default: Iteration Number
+            FoldersToCreate:
+                default: Bucket Folders
+            ProjectName:
+                default: Project Name
+            CostCenter:
+                default: Cost Center
+            OwnerEmail:
+                default: Owner Email
+            SupportTeamEmail:
+                default: Support Team Email
+
+Parameters:
+    DivisionName:
+        Type: String
+        AllowedValues:
+            - ent
+            - ems
+            - hc
+            - cor
+            - com
+            - jps
+            - jgp
+            - cor
+            - fin
+            - nyp
+        Description: >
+            Enter Division/Company >>   
+              Enterprise (ent),
+              EMS (ems),
+              Healthcare (hc),
+              Corporate (cor),
+              Commercial (com),
+              Packaging (jps),
+              GreenPoint (jgp),
+              Core (core),
+              Finance (fin),
+              Nypro (nyp)
+    EnvironmentName:
+        Type: String
+        Default: dev
+        AllowedValues:
+            - dev
+            - stg
+            - prd
+        Description: >
+            Enter Environment >>  
+              Development (dev), Staging (stg), Production (prd). The Default is Development (dev)
+    RegionAcronym:
+        Type: String
+        AllowedValues:
+            - uea1
+            - uwe2
+            - ecn1
+            - ewe2
+            - ane1
+            - ase1
+        Description: >
+            Enter Region Acronym >>     
+              us-east-1 (uea1),
+              us-west-2 (uwe2),
+              eu-central-1 (ecn1),
+              eu-west-2 (ewe2),
+              ap-northeast-1 (ane1),
+              ap-southeast-1 (ase1)
+    ProjectIdentifier:
+        Type: String
+        Description: Enter a Project Identifier (4 to 10 characters allowed)
+        AllowedPattern: "^[a-z][a-z0-9]{3,9}$"
+        MinLength: "4"
+        MaxLength: "10"
+        ConstraintDescription: Must begin with a letter and contain a minimum of 4 and a maximum of 10 alphanumeric lowercase characters.
+    IterationNumber:
+        Type: String
+        Description: Enter an Iteration Identifier (3 numbers allowed, e.g. 001)
+        AllowedPattern: "[0-9][0-9][0-9]"
+        ConstraintDescription: Must contain 3 numeric characters.
+    FoldersToCreate:
+        Type: CommaDelimitedList
+        Description: |
+            Comma delimited list of S3 bucket folders >>
+            Input (Files to upload from data source),
+            Output (Transformed files),
+            Processed (Processed filed into DW),
+            Errors (Failed files),
+            Test (Sample test file (skip for PRD)).
+        Default: Input, Output, Processed, Errors, Test
+    ProjectName:
+        Type: String
+        Description: Enter a Project Name (10 to 60 characters allowed)
+        AllowedPattern: "^[a-zA-Z0-9\\s]{10,60}$"
+        MinLength: "10"
+        MaxLength: "60"
+        ConstraintDescription: Must begin with a letter and contain a minimum of 10 and a maximum of 60 alphanumeric characters.
+    CostCenter:
+        Type: String
+        Description: Enter a Cost Center number (4 to 6 numbers allowed).
+        AllowedPattern: "^[0-9]{4,6}$"
+        MinLength: "4"
+        MaxLength: "6"
+        ConstraintDescription: Must contain a minimum of 4 and a maximum of 6 numeric characters.
+    OwnerEmail:
+        Type: String
+        Description: Enter the owner company email address.
+        AllowedPattern: "[^@]+@jabil.com"
+        ConstraintDescription: Enter a valid Jabil email address.
+    SupportTeamEmail:
+        Type: String
+        Default: "support_dp@jabil.com"
+        Description: Enter the support team email address.
+        AllowedPattern: "[^@]+@jabil.com"
+        ConstraintDescription: Enter a valid Jabil email address.
+
+Resources:
+    S3Bucket:
+        Type: AWS::S3::Bucket
+        Properties:
+            BucketName: !Sub "s3-${DivisionName}-${EnvironmentName}-${RegionAcronym}-${ProjectIdentifier}-${IterationNumber}"
+            AccessControl: Private
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: True
+                BlockPublicPolicy: True
+                IgnorePublicAcls: True
+                RestrictPublicBuckets: True
+            VersioningConfiguration:
+                Status: Enabled
+            BucketEncryption:
+                ServerSideEncryptionConfiguration:
+                    - ServerSideEncryptionByDefault:
+                          SSEAlgorithm: AES256
+            Tags:
+                - Key: "jbl:cost_center"
+                  Value: !Sub "${CostCenter}"
+                - Key: "jbl:project_name"
+                  Value: !Sub "${ProjectName}"
+                - Key: "jbl:support_team_email"
+                  Value: !Sub "${SupportTeamEmail}"
+                - Key: "jbl:owner_email"
+                  Value: !Sub "${OwnerEmail}"
+
+            # LifecycleConfiguration:
+            #   Rules:
+            #     - Id: CleanUpTempFolder
+            #       Prefix: glue/temp/
+            #       Status: Enabled
+            #       ExpirationInDays: 1
+            #     - Id: CleanUpGlueFolder
+            #       Prefix: glue/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+            #     - Id: CleanUpLambdaFolder
+            #       Prefix: lambda/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+            #     - Id: CleanUpCloudformationFolder
+            #       Prefix: cloudformation/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+            #     - Id: CleanUpAirflowFolder
+            #       Prefix: airflow/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+
+    S3CustomResource:
+        Type: Custom::S3CustomResource
+        Properties:
+            ServiceToken: !GetAtt AWSLambdaFunction.Arn
+            the_bucket: !Ref S3Bucket
+            folders_to_create: !Ref FoldersToCreate
+    AWSLambdaFunction:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: "Creates S3 buckets folders"
+            #FunctionName: !Sub '${AWS::StackName}-${AWS::Region}-lambda'
+            FunctionName: !Sub "lamb-${DivisionName}-${EnvironmentName}-${RegionAcronym}-bucketfolders-001"
+            Handler: index.handler
+            Role: !GetAtt AWSLambdaExecutionRole.Arn
+            Timeout: 360
+            Runtime: python3.9
+            Code:
+                ZipFile: |
+                    import boto3
+                    import cfnresponse
+                    def handler(event, context):
+                        # Init ...
+                        the_event = event['RequestType']
+                        print("The event is: ", str(the_event))
+                        response_data = {}
+                        s_3 = boto3.client('s3')
+                        # Retrieve parameters
+                        the_bucket = event['ResourceProperties']['the_bucket']
+                        folders_to_create = event['ResourceProperties']['folders_to_create']
+                        try:
+                            if the_event in ('Create', 'Update'):
+                                print("Requested folders: ", str(folders_to_create))
+                                for folder_name in folders_to_create:
+                                    print("Creating: ", str(folder_name))
+                                    s_3.put_object(Bucket=the_bucket,
+                                                   Key=(folder_name
+                                                        + '/'))
+                            elif the_event == 'Delete':
+                                print("Deleting S3 content...")
+                                b_operator = boto3.resource('s3')
+                                b_operator.Bucket(str(the_bucket)).objects.all().delete()
+                            # Everything OK... send the signal back
+                            print("Operation successful!")
+                            cfnresponse.send(event,
+                                             context,
+                                             cfnresponse.SUCCESS,
+                                             response_data)
+                        except Exception as e:
+                            print("Operation failed...")
+                            print(str(e))
+                            response_data['Data'] = str(e)
+                            cfnresponse.send(event,
+                                             context,
+                                             cfnresponse.FAILED,
+                                             response_data)
+    AWSLambdaExecutionRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    - Action:
+                          - sts:AssumeRole
+                      Effect: Allow
+                      Principal:
+                          Service:
+                              - lambda.amazonaws.com
+                Version: "2012-10-17"
+            Path: "/"
+            Policies:
+                - PolicyDocument:
+                      Statement:
+                          - Action:
+                                - logs:CreateLogGroup
+                                - logs:CreateLogStream
+                                - logs:PutLogEvents
+                            Effect: Allow
+                            Resource: arn:aws:logs:*:*:*
+                      Version: "2012-10-17"
+                  #  PolicyName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambda-CW
+                  PolicyName: !Sub "iamp-${DivisionName}-${EnvironmentName}-${RegionAcronym}-awslambda-cw-001"
+                - PolicyDocument:
+                      Statement:
+                          - Action:
+                                - s3:PutObject
+                                - s3:DeleteObject
+                                - s3:List*
+                            Effect: Allow
+                            Resource:
+                                - !Sub arn:aws:s3:::${S3Bucket}/*
+                                - !Sub arn:aws:s3:::${S3Bucket}
+                      Version: "2012-10-17"
+                  #  PolicyName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambda-S3
+                  PolicyName: !Sub "iamp-${DivisionName}-${EnvironmentName}-${RegionAcronym}-awslambda-s3-001"
+            #  RoleName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambdaExecutionRole
+            RoleName: !Sub "iamr-${DivisionName}-${EnvironmentName}-${RegionAcronym}-awslambda-execution-001"

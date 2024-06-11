@@ -1,0 +1,200 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This CloudFormation template creates a S3 Bucket following the EMS Data Services standards"
+Metadata:
+    Version: 2.0
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                  default: "BUCKET NAME"
+              Parameters:
+                  - DivisionName
+                  - EnvironmentName
+                  - RegionAcronym
+                  - ProjectIdentifier
+                  - IterationNumber
+                  - FoldersToCreate
+            - Label:
+                  default: "PROJECT INFORMATION"
+              Parameters:
+                  - ProjectName
+                  - CostCenter
+                  - SupportTeamEmail
+                  - OwnerEmail
+        ParameterLabels:
+            DivisionName:
+                default: Division Name
+            EnvironmentName:
+                default: Environment Name
+            RegionAcronym:
+                default: Region Acronym
+            ProjectIdentifier:
+                default: Project Identifier
+            IterationNumber:
+                default: Iteration Number
+            FoldersToCreate:
+                default: Bucket Folders
+            ProjectName:
+                default: Project Name
+            CostCenter:
+                default: Cost Center
+            OwnerEmail:
+                default: Owner Email
+            SupportTeamEmail:
+                default: Support Team Email
+
+Parameters:
+    DivisionName:
+        Type: String
+        AllowedValues:
+            - ent
+            - ems
+            - hc
+            - cor
+            - com
+            - jps
+            - jgp
+            - cor
+            - fin
+            - nyp
+        Description: >
+            Enter Division/Company >>   
+              Enterprise (ent),
+              EMS (ems),
+              Healthcare (hc),
+              Corporate (cor),
+              Commercial (com),
+              Packaging (jps),
+              GreenPoint (jgp),
+              Core (core),
+              Finance (fin),
+              Nypro (nyp)
+    EnvironmentName:
+        Type: String
+        Default: dev
+        AllowedValues:
+            - dev
+            - stg
+            - prd
+        Description: >
+            Enter Environment >>  
+              Development (dev), Staging (stg), Production (prd). The Default is Development (dev)
+    RegionAcronym:
+        Type: String
+        AllowedValues:
+            - uea1
+            - uwe2
+            - ecn1
+            - ewe2
+            - ane1
+            - ase1
+        Description: >
+            Enter Region Acronym >>     
+              us-east-1 (uea1),
+              us-west-2 (uwe2),
+              eu-central-1 (ecn1),
+              eu-west-2 (ewe2),
+              ap-northeast-1 (ane1),
+              ap-southeast-1 (ase1)
+    ProjectIdentifier:
+        Type: String
+        Description: Enter a Project Identifier (4 to 10 characters allowed)
+        AllowedPattern: "^[a-z][a-z0-9]{3,9}$"
+        MinLength: "4"
+        MaxLength: "10"
+        ConstraintDescription: Must begin with a letter and contain a minimum of 4 and a maximum of 10 alphanumeric lowercase characters.
+    IterationNumber:
+        Type: String
+        Description: Enter an Iteration Identifier (3 numbers allowed, e.g. 001)
+        AllowedPattern: "[0-9][0-9][0-9]"
+        ConstraintDescription: Must contain 3 numeric characters.
+    FoldersToCreate:
+        Type: CommaDelimitedList
+        Description: |
+            Comma delimited list of S3 bucket folders >>
+            Input (Files to upload from data source),
+            Output (Transformed files),
+            Processed (Processed filed into DW),
+            Errors (Failed files),
+            Test (Sample test file (skip for PRD)).
+        Default: Input, Output, Processed, Errors, Test
+    ProjectName:
+        Type: String
+        Description: Enter a Project Name (10 to 60 characters allowed)
+        AllowedPattern: "^[a-zA-Z0-9\\s]{10,60}$"
+        MinLength: "10"
+        MaxLength: "60"
+        ConstraintDescription: Must begin with a letter and contain a minimum of 10 and a maximum of 60 alphanumeric characters.
+    CostCenter:
+        Type: String
+        Description: Enter a Cost Center number (4 to 6 numbers allowed).
+        AllowedPattern: "^[0-9]{4,6}$"
+        MinLength: "4"
+        MaxLength: "6"
+        ConstraintDescription: Must contain a minimum of 4 and a maximum of 6 numeric characters.
+    OwnerEmail:
+        Type: String
+        Description: Enter the owner company email address.
+        AllowedPattern: "[^@]+@jabil.com"
+        ConstraintDescription: Enter a valid Jabil email address.
+    SupportTeamEmail:
+        Type: String
+        Default: "support_dp@jabil.com"
+        Description: Enter the support team email address.
+        AllowedPattern: "[^@]+@jabil.com"
+        ConstraintDescription: Enter a valid Jabil email address.
+    LambdaFunctionName:
+        Type: String
+        Default: ""
+
+Resources:
+    S3Bucket:
+        Type: AWS::S3::Bucket
+        Properties:
+            BucketName: !Sub "s3-${DivisionName}-${EnvironmentName}-${RegionAcronym}-${ProjectIdentifier}-${IterationNumber}"
+
+            AccessControl: Private
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: True
+                BlockPublicPolicy: True
+                IgnorePublicAcls: True
+                RestrictPublicBuckets: True
+            VersioningConfiguration:
+                Status: Enabled
+            BucketEncryption:
+                ServerSideEncryptionConfiguration:
+                    - ServerSideEncryptionByDefault:
+                          SSEAlgorithm: AES256
+
+            Tags:
+                - Key: "jbl:cost_center"
+                  Value: !Sub "${CostCenter}"
+                - Key: "jbl:project_name"
+                  Value: !Sub "${ProjectName}"
+                - Key: "jbl:support_team_email"
+                  Value: !Sub "${SupportTeamEmail}"
+                - Key: "jbl:owner_email"
+                  Value: !Sub "${OwnerEmail}"
+
+            # LifecycleConfiguration:
+            #   Rules:
+            #     - Id: CleanUpTempFolder
+            #       Prefix: glue/temp/
+            #       Status: Enabled
+            #       ExpirationInDays: 1
+            #     - Id: CleanUpGlueFolder
+            #       Prefix: glue/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+            #     - Id: CleanUpLambdaFolder
+            #       Prefix: lambda/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+            #     - Id: CleanUpCloudformationFolder
+            #       Prefix: cloudformation/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+            #     - Id: CleanUpAirflowFolder
+            #       Prefix: airflow/
+            #       Status: Enabled
+            #       NoncurrentVersionExpirationInDays: 1
+
